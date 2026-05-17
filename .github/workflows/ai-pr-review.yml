@@ -21,16 +21,14 @@ jobs:
   ai-review:
     name: Groq AI Review & Label
     runs-on: ubuntu-latest
-    # Run if it's an automated PR from someone else OR a comment starting with /review on a PR
-    if: >
-      (github.event_name == 'pull_request_target' && github.event.pull_request.user.login != 'arpittkhandelwal') ||
-      (github.event_name == 'issue_comment' && github.event.issue.pull_request && startsWith(github.event.comment.body, '/review'))
+    # Run if it's an automated PR OR a comment starting with /review on a PR
+    if: ${{ github.event_name == 'pull_request_target' || (github.event_name == 'issue_comment' && github.event.issue.pull_request != null && startsWith(github.event.comment.body, '/review')) }}
     steps:
       - name: Fetch PR diff via GitHub API
         run: |
           PR_NUM="${{ github.event.issue.number || github.event.pull_request.number }}"
           curl -s \
-            -H "Authorization: Bearer ${{ secrets.PAT_TOKEN }}" \
+            -H "Authorization: Bearer ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github.v3.diff" \
             "https://api.github.com/repos/${{ github.repository }}/pulls/${PR_NUM}" \
             > pr.diff
@@ -53,59 +51,60 @@ jobs:
 
           prompt = f"""You are a senior software engineer performing a code review for ZerithDB — an open-source TypeScript monorepo that implements a distributed, in-browser database using WebRTC P2P networking, CRDTs for conflict resolution, and IndexedDB for persistence.
 
-PR #{pr_number} by @{pr_author}
-Title: {pr_title}
-Description: {pr_body}
+          PR #{pr_number} by @{pr_author}
+          Title: {pr_title}
+          Description: {pr_body}
 
-Diff:
-```diff
-{diff}
-```
+          Diff:
+          ```diff
+          {diff}
+          ```
 
-Review this PR thoroughly. Focus on:
-- Correctness and logic errors
-- TypeScript type safety
-- Performance implications (especially in hot paths like find(), sync, CRDT merge)
-- Security concerns (especially in auth/ and network/ packages)
-- Test coverage adequacy
-- Code style and consistency with the codebase
+          Review this PR thoroughly. Focus on:
+          - Correctness and logic errors
+          - TypeScript type safety
+          - Performance implications (especially in hot paths like find(), sync, CRDT merge)
+          - Security concerns (especially in auth/ and network/ packages)
+          - Test coverage adequacy
+          - Code style and consistency with the codebase
 
-Also, analyze the PR and suggest appropriate GitHub labels. Common labels include:
-- Types: `bug`, `enhancement`, `type:docs`, `type:refactor`, `type:testing`, `type:chore`
-- Levels: `level:beginner`, `level:intermediate`, `level:advanced`, `level:critical`
-- Packages: `package:core`, `package:db`, `package:sync`, `package:network`, `package:auth`, `package:cli`, `package:web`
+          Also, analyze the PR and suggest appropriate GitHub labels. Common labels include:
+          - Types: `bug`, `enhancement`, `type:docs`, `type:refactor`, `type:testing`, `type:chore`
+          - Levels: `level:beginner`, `level:intermediate`, `level:advanced`, `level:critical`
+          - Packages: `package:core`, `package:db`, `package:sync`, `package:network`, `package:auth`, `package:cli`, `package:web`
 
-Respond ONLY with valid JSON — no markdown, no extra text:
-{{
-  "verdict": "APPROVE" | "REQUEST_CHANGES" | "COMMENT",
-  "summary": "2-3 sentence high-level assessment of the PR",
-  "issues": [
-    {{
-      "severity": "critical" | "major" | "minor" | "nitpick",
-      "file": "relative/path/to/file or empty string",
-      "description": "specific, actionable description of the issue"
-    }}
-  ],
-  "positives": ["specific things done well"],
-  "key_suggestion": "the single most important improvement to make, or empty string",
-  "safe_to_merge": true | false,
-  "suggested_labels": ["label1", "label2"]
-}}
+          Respond ONLY with valid JSON — no markdown, no extra text:
+          {{
+            "verdict": "APPROVE" | "REQUEST_CHANGES" | "COMMENT",
+            "summary": "2-3 sentence high-level assessment of the PR",
+            "issues": [
+              {{
+                "severity": "critical" | "major" | "minor" | "nitpick",
+                "file": "relative/path/to/file or empty string",
+                "description": "specific, actionable description of the issue"
+              }}
+            ],
+            "positives": ["specific things done well"],
+            "key_suggestion": "the single most important improvement to make, or empty string",
+            "safe_to_merge": true | false,
+            "suggested_labels": ["label1", "label2"]
+          }}
 
-Verdict rules:
-- APPROVE: no blockers, code is solid
-- REQUEST_CHANGES: has critical or major issues that must be fixed
-- COMMENT: only minor/nitpick issues or just observations
-PYEOF
+          Verdict rules:
+          - APPROVE: no blockers, code is solid
+          - REQUEST_CHANGES: has critical or major issues that must be fixed
+          - COMMENT: only minor/nitpick issues or just observations
+          """
 
-          api_key = os.environ.get('GROQ_API_KEY', '')
-          if not api_key:
-              print("ERROR: GROQ_API_KEY secret not set", file=sys.stderr)
+          primary_key  = os.environ.get('GROQ_API_KEY', '')
+          fallback_key = os.environ.get('GROQ_API_KEY_FALLBACK', '')
+          if not primary_key and not fallback_key:
+              print("ERROR: Neither GROQ_API_KEY nor GROQ_API_KEY_FALLBACK secret is set", file=sys.stderr)
               sys.exit(1)
 
           url = "https://api.groq.com/openai/v1/chat/completions"
           payload = {
-              "model": "llama3-70b-8192",
+              "model": "llama-3.3-70b-versatile",
               "messages": [
                   {"role": "system", "content": "You are a helpful senior code reviewer. You strictly output JSON."},
                   {"role": "user", "content": prompt}
@@ -114,21 +113,39 @@ PYEOF
               "response_format": {"type": "json_object"}
           }
 
-          req = urllib.request.Request(
-              url,
-              data=json.dumps(payload).encode(),
-              headers={
-                  "Authorization": f"Bearer {api_key}",
-                  "Content-Type": "application/json"
-              },
-              method="POST"
-          )
-
-          try:
+          def call_groq(api_key):
+              req = urllib.request.Request(
+                  url,
+                  data=json.dumps(payload).encode(),
+                  headers={
+                      "Authorization": f"Bearer {api_key}",
+                      "Content-Type": "application/json",
+                      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+                  },
+                  method="POST"
+              )
               with urllib.request.urlopen(req, timeout=60) as resp:
-                  data = json.load(resp)
-          except urllib.error.HTTPError as e:
-              print(f"Groq API error {e.code}: {e.read().decode()}", file=sys.stderr)
+                  return json.load(resp)
+
+          data = None
+          keys_to_try = [("primary", primary_key), ("fallback", fallback_key)]
+          for label, key in keys_to_try:
+              if not key:
+                  continue
+              try:
+                  data = call_groq(key)
+                  print(f"✅ Groq request succeeded using {label} key")
+                  break
+              except urllib.error.HTTPError as e:
+                  body = e.read().decode()
+                  print(f"Groq API error {e.code} ({label} key): {body}", file=sys.stderr)
+                  if e.code == 429 and label == "primary" and fallback_key:
+                      print("Rate limit hit on primary key — retrying with fallback key…", file=sys.stderr)
+                      continue
+                  sys.exit(1)
+
+          if data is None:
+              print("ERROR: All Groq API keys exhausted or unavailable", file=sys.stderr)
               sys.exit(1)
 
           text = data['choices'][0]['message']['content']
@@ -157,7 +174,8 @@ PYEOF
           print(f"✅ Review generated — verdict: {review.get('verdict')}, safe_to_merge: {review.get('safe_to_merge')}, labels: {review.get('suggested_labels')}")
           PYEOF
         env:
-          GROQ_API_KEY:   ${{ secrets.GROQ_API_KEY }}
+          GROQ_API_KEY:          ${{ secrets.GROQ_API_KEY }}
+          GROQ_API_KEY_FALLBACK: ${{ secrets.GROQ_API_KEY_FALLBACK }}
           PR_TITLE:       ${{ github.event.issue.title || github.event.pull_request.title }}
           PR_BODY:        ${{ github.event.issue.body || github.event.pull_request.body }}
           PR_AUTHOR:      ${{ github.event.issue.user.login || github.event.pull_request.user.login }}
@@ -180,18 +198,16 @@ PYEOF
           repo = os.environ['GITHUB_REPOSITORY']
 
           print(f"Applying labels: {labels}")
-          cmd = ['gh', 'pr', 'edit', pr, '--repo', repo]
-          for label in labels:
-              cmd.extend(['--add-label', label])
-
-          result = subprocess.run(cmd, capture_output=True, text=True)
+          payload = json.dumps({"labels": labels})
+          cmd = ['gh', 'api', f'repos/{repo}/issues/{pr}/labels', '--input', '-']
+          result = subprocess.run(cmd, input=payload, capture_output=True, text=True)
           if result.returncode != 0:
               print(f"Failed to apply labels: {result.stderr}")
           else:
               print("✅ Labels applied successfully")
           PYEOF
         env:
-          GH_TOKEN:            ${{ secrets.PAT_TOKEN }}
+          GH_TOKEN:            ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
           PR_NUMBER:           ${{ github.event.issue.number || github.event.pull_request.number }}
           GITHUB_REPOSITORY:   ${{ github.repository }}
 
@@ -263,7 +279,7 @@ PYEOF
               print("✅ Review comment posted", flush=True)
           PYEOF
         env:
-          GH_TOKEN:            ${{ secrets.PAT_TOKEN }}
+          GH_TOKEN:            ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
           PR_NUMBER:           ${{ github.event.issue.number || github.event.pull_request.number }}
           GITHUB_REPOSITORY:   ${{ github.repository }}
 
@@ -299,7 +315,7 @@ PYEOF
               print(f"✅ Formal review submitted: {verdict}", flush=True)
           PYEOF
         env:
-          GH_TOKEN:          ${{ secrets.PAT_TOKEN }}
+          GH_TOKEN:          ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
           PR_NUMBER:         ${{ github.event.issue.number || github.event.pull_request.number }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         continue-on-error: true

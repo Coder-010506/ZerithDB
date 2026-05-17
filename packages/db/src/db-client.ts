@@ -245,12 +245,18 @@ export class CollectionClient<T extends Record<string, any> = Record<string, any
 
       if ("$eq" in conditions && fieldValue !== conditions["$eq"]) return false;
       if ("$ne" in conditions && fieldValue === conditions["$ne"]) return false;
-      if ("$gt" in conditions && !((fieldValue as any) > (conditions["$gt"] as never))) return false;
-      if ("$gte" in conditions && !((fieldValue as any) >= (conditions["$gte"] as never))) return false;
-      if ("$lt" in conditions && !((fieldValue as any) < (conditions["$lt"] as never))) return false;
-      if ("$lte" in conditions && !((fieldValue as any) <= (conditions["$lte"] as never))) return false;
-      if ("$in" in conditions && !(conditions["$in"] as unknown[]).includes(fieldValue)) return false;
-      if ("$nin" in conditions && (conditions["$nin"] as unknown[]).includes(fieldValue)) return false;
+      if ("$gt" in conditions && !((fieldValue as any) > (conditions["$gt"] as never)))
+        return false;
+      if ("$gte" in conditions && !((fieldValue as any) >= (conditions["$gte"] as never)))
+        return false;
+      if ("$lt" in conditions && !((fieldValue as any) < (conditions["$lt"] as never)))
+        return false;
+      if ("$lte" in conditions && !((fieldValue as any) <= (conditions["$lte"] as never)))
+        return false;
+      if ("$in" in conditions && !(conditions["$in"] as unknown[]).includes(fieldValue))
+        return false;
+      if ("$nin" in conditions && (conditions["$nin"] as unknown[]).includes(fieldValue))
+        return false;
     }
     return true;
   }
@@ -279,7 +285,7 @@ class ZerithDBDexie extends Dexie {
   ensureCollection(name: string): Table {
     if (!this.tableMap.has(name)) {
       this._currentSchema[name] = "_id, _createdAt, _updatedAt";
-      
+
       // We must increment the version for every new collection added dynamically
       const nextVersion = Math.max(this.verno, this._pendingVersion) + 1;
       this._pendingVersion = nextVersion;
