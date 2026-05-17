@@ -54,6 +54,7 @@
   },
   "packageManager": "pnpm@10.24.0",
   "dependencies": {
-    "@noble/hashes": "^2.2.0"
+    "@noble/hashes": "^2.2.0",
+    "zerithdb-sdk": "^0.1.0"
   }
 }

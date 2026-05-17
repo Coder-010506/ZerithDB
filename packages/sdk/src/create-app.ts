@@ -119,6 +119,10 @@ export function createApp(config: ZerithDBConfig): ZerithDBApp {
       reconnectDelay: 1000,
       ...config.network,
     },
+    security: {
+      encryptLocalDB: false,
+      ...config.security,
+    },
   };
 
   const logger = new Logger(resolvedConfig, "SDK");

@@ -52,6 +52,15 @@ export interface DebugConfig {
   devtools?: boolean;
 }
 
+export interface SecurityConfig {
+  /**
+   * Encrypt local IndexedDB records at rest.
+   * This is optional and requires browser crypto support.
+   * @default false
+   */
+  encryptLocalDB?: boolean;
+}
+
 export interface NetworkConfig {
   /**
    * Whether to automatically reconnect when a peer disconnects.
@@ -78,6 +87,7 @@ export interface ZerithDBConfig {
   auth?: AuthConfig;
   network?: NetworkConfig;
   debug?: DebugConfig;
+  security?: SecurityConfig;
 
   /**
    * Log level for internal ZerithDB diagnostics.

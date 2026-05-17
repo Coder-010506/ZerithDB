@@ -11,6 +11,9 @@ importers:
       '@noble/hashes':
         specifier: ^2.2.0
         version: 2.2.0
+      zerithdb-sdk:
+        specifier: ^0.1.0
+        version: 0.1.0
     devDependencies:
       '@changesets/cli':
         specifier: ^2.27.7
@@ -5396,6 +5399,24 @@ packages:
   yoctocolors@2.1.2:
     resolution: {integrity: sha512-CzhO+pFNo8ajLM2d2IW/R93ipy99LWjtwblvC1RsoSUMZgyLbYFr221TnSNT7GjGdYui6P459mw9JH/g/zW2ug==}
     engines: {node: '>=18'}
+
+  zerithdb-auth@0.1.0:
+    resolution: {integrity: sha512-ETRtj2UrePMQ5CQ5z26Wp3La1QXng/kVMG1JZLBdttCxigPj/4J3nonxgQ7Uc77PGLwEpVQ/A5Uw1VuuR8/ebQ==}
+
+  zerithdb-core@0.1.0:
+    resolution: {integrity: sha512-lrjZ+RuWwfsqZfXpWdCfUmYXkEKrEPA4x5YCj0Dg3ktvgcm6+qTVqq6zz+Zo2AQJdkAISVCpY5JduLo2W5ZIww==}
+
+  zerithdb-db@0.1.0:
+    resolution: {integrity: sha512-+J+KEDSogh3A0mK/FQxXR8W6GMKIA45vo7S+BK7zJtr4lU9w/0lrd4CQcvH8X1M/uAEZHbiwJVy4blgqnUN5Cg==}
+
+  zerithdb-network@0.1.0:
+    resolution: {integrity: sha512-kfJF8cbuTYQ+LEiYRvgwFHS6/JqfbHDtXbuz3La93Epe63jgEXigzGZ5tZ/ueS0VyvdkttxouAf2VePOcIn5XQ==}
+
+  zerithdb-sdk@0.1.0:
+    resolution: {integrity: sha512-y57u9WjUpuMgz+ci6fDLX7HnnV1JKyIiaJ5x2HX8rWilPnitwrl/nI/CZNs/iE1fiVBGZ5QeX0HGZp4OO9w4rA==}
+
+  zerithdb-sync@0.1.0:
+    resolution: {integrity: sha512-LaOvk1mx/yrt6sFZRU1WO6HFGF1A6qEBdYOVnQQrWyXD5sA+jF1ZAMUssLsKg/uhauQTlZMU7mFrMvM+0T27aQ==}
 
   zod-validation-error@4.0.2:
     resolution: {integrity: sha512-Q6/nZLe6jxuU80qb/4uJ4t5v2VEZ44lzQjPDhYJNztRQ4wyWc6VF3D3Kb/fAuPetZQnhS3hnajCf9CsWesghLQ==}
@@ -10827,6 +10848,50 @@ snapshots:
   yocto-queue@1.2.2: {}
 
   yoctocolors@2.1.2: {}
+
+  zerithdb-auth@0.1.0:
+    dependencies:
+      '@noble/ed25519': 2.3.0
+      '@noble/hashes': 2.2.0
+      multiformats: 13.4.2
+      zerithdb-core: 0.1.0
+
+  zerithdb-core@0.1.0: {}
+
+  zerithdb-db@0.1.0:
+    dependencies:
+      dexie: 4.4.2
+      uuid: 10.0.0
+      zerithdb-core: 0.1.0
+
+  zerithdb-network@0.1.0:
+    dependencies:
+      simple-peer: 9.11.1
+      zerithdb-auth: 0.1.0
+      zerithdb-core: 0.1.0
+    transitivePeerDependencies:
+      - supports-color
+
+  zerithdb-sdk@0.1.0:
+    dependencies:
+      zerithdb-auth: 0.1.0
+      zerithdb-core: 0.1.0
+      zerithdb-db: 0.1.0
+      zerithdb-network: 0.1.0
+      zerithdb-sync: 0.1.0
+    transitivePeerDependencies:
+      - supports-color
+
+  zerithdb-sync@0.1.0:
+    dependencies:
+      lib0: 0.2.117
+      y-indexeddb: 9.0.12(yjs@13.6.30)
+      yjs: 13.6.30
+      zerithdb-core: 0.1.0
+      zerithdb-db: 0.1.0
+      zerithdb-network: 0.1.0
+    transitivePeerDependencies:
+      - supports-color
 
   zod-validation-error@4.0.2(zod@4.4.3):
     dependencies:

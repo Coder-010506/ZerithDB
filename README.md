@@ -79,14 +79,14 @@ That's it. No `.env` files. No `docker-compose.yml`. No cloud accounts.
 
 ## Features
 
-| Feature                | Description                                                                                           |
-| ---------------------- | ----------------------------------------------------------------------------------------------------- |
-| 🗄️ **Local Database**  | IndexedDB-backed via Dexie. MongoDB-style query API. Reactive live queries.                           |
-| 🔄 **CRDT Sync**       | Yjs-powered conflict-free sync. Merge without servers. Works across browser tabs, devices, and peers. |
-| 🕸️ **P2P Network**     | WebRTC mesh via `simple-peer`. Minimal signaling server (only for initial handshake).                 |
-| 🔐 **Keychain Auth**   | Ed25519 keypair identity. Sign-in is `generateKey()`. No email, no OAuth, no passwords.               |
-| 📦 **Modular SDK**     | Tree-shakeable. Use only what you need. Works with React, Vue, Svelte, or vanilla JS.                 |
-| ⚡ **Zero Config CLI** | `npx zerithdb init` bootstraps a full project in seconds.                                             |
+| Feature                      | Description                                                                                           |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------- |
+| 🗄️**Local Database** | IndexedDB-backed via Dexie. MongoDB-style query API. Reactive live queries.                           |
+| 🔄**CRDT Sync**        | Yjs-powered conflict-free sync. Merge without servers. Works across browser tabs, devices, and peers. |
+| 🕸️**P2P Network**    | WebRTC mesh via `simple-peer`. Minimal signaling server (only for initial handshake).               |
+| 🔐**Keychain Auth**    | Ed25519 keypair identity. Sign-in is `generateKey()`. No email, no OAuth, no passwords.             |
+| 📦**Modular SDK**      | Tree-shakeable. Use only what you need. Works with React, Vue, Svelte, or vanilla JS.                 |
+| ⚡**Zero Config CLI**  | `npx zerithdb init` bootstraps a full project in seconds.                                           |
 
 ---
 
@@ -96,8 +96,8 @@ That's it. No `.env` files. No `docker-compose.yml`. No cloud accounts.
 
 If you're new here, follow these beginner friendly steps to get ZerithDB running on your machine:
 
-| Step | Action              | Command                           | What it does                            |
-| ---- | ------------------- | --------------------------------- | --------------------------------------- |
+| Step | Action                    | Command                             | What it does                            |
+| ---- | ------------------------- | ----------------------------------- | --------------------------------------- |
 | 1    | **Initialize**      | `npx zerithdb@latest init my-app` | Creates your project folder.            |
 | 2    | **Go to Directory** | `cd my-app`                       | Enters the folder you just created.     |
 | 3    | **Install**         | `npm install`                     | Gets all the tools needed for the app.  |
@@ -189,15 +189,15 @@ that, peers communicate directly.
 
 ## Packages
 
-| Package                                | Version                                               | Description                       |
-| -------------------------------------- | ----------------------------------------------------- | --------------------------------- |
+| Package                               | Version                                             | Description                       |
+| ------------------------------------- | --------------------------------------------------- | --------------------------------- |
 | [`zerithdb-sdk`](packages/sdk)         | ![npm](https://img.shields.io/npm/v/zerithdb-sdk)     | Main developer-facing API         |
 | [`zerithdb-db`](packages/db)           | ![npm](https://img.shields.io/npm/v/zerithdb-db)      | IndexedDB adapter (Dexie wrapper) |
 | [`zerithdb-sync`](packages/sync)       | ![npm](https://img.shields.io/npm/v/zerithdb-sync)    | CRDT sync engine (Yjs)            |
 | [`zerithdb-network`](packages/network) | ![npm](https://img.shields.io/npm/v/zerithdb-network) | WebRTC P2P layer                  |
 | [`zerithdb-auth`](packages/auth)       | ![npm](https://img.shields.io/npm/v/zerithdb-auth)    | Keypair identity management       |
 | [`zerithdb-core`](packages/core)       | ![npm](https://img.shields.io/npm/v/zerithdb-core)    | Internal types, events, utilities |
-| [`zerithdb-cli`](packages/cli)         | ![npm](https://img.shields.io/npm/v/zerithdb-cli)     | `npx zerithdb init` CLI tool      |
+| [`zerithdb-cli`](packages/cli)         | ![npm](https://img.shields.io/npm/v/zerithdb-cli)     | `npx zerithdb init` CLI tool    |
 
 ---
 
@@ -258,9 +258,9 @@ Good places to start:
 
 ## Community
 
-|                |                                                        |
-| -------------- | ------------------------------------------------------ |
-| 💬 **Discord** | [discord.gg/MhvuDvzWfF](https://discord.gg/MhvuDvzWfF) |
+|                     |                                                     |
+| ------------------- | --------------------------------------------------- |
+| 💬**Discord** | [discord.gg/MhvuDvzWfF](https://discord.gg/MhvuDvzWfF) |
 
 ---
 

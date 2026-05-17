@@ -9,7 +9,17 @@ import type {
 } from "zerithdb-core";
 import { ZerithDBError, ErrorCode } from "zerithdb-core";
 import { wrapIDBOperation } from "./internal/wrap-idb-operation.js";
+import { LocalDbCrypto } from "./local-db-crypto.js";
 import type { BackupExportOptions, BackupSnapshot } from "./backup.js";
+
+type EncryptedRecord = {
+  _id: string;
+  _createdAt: number;
+  _updatedAt: number;
+  encryptedPayload: string;
+};
+
+type StoredRow<T extends Record<string, any>> = Document<T> | EncryptedRecord;
 
 /**
  * A handle to a single named collection within the ZerithDB local database.
@@ -17,8 +27,9 @@ import type { BackupExportOptions, BackupSnapshot } from "./backup.js";
  */
 export class CollectionClient<T extends Record<string, any> = Record<string, any>> {
   constructor(
-    private readonly table: Table<Document<T>>,
-    private readonly collectionName: string
+    private readonly table: Table<StoredRow<T>>,
+    private readonly collectionName: string,
+    private readonly crypto?: LocalDbCrypto
   ) {}
 
   /**
@@ -39,7 +50,7 @@ export class CollectionClient<T extends Record<string, any> = Record<string, any
       ErrorCode.DB_WRITE_FAILED,
       `Failed to insert into collection "${this.collectionName}"`,
       async () => {
-        await this.table.add(doc);
+        await this.table.add(await this.prepareDocumentForStorage(doc));
         return { id };
       }
     );
@@ -61,7 +72,9 @@ export class CollectionClient<T extends Record<string, any> = Record<string, any
       ErrorCode.DB_WRITE_FAILED,
       `Failed to bulk insert into collection "${this.collectionName}"`,
       async () => {
-        await this.table.bulkAdd(docs);
+        await this.table.bulkAdd(
+          await Promise.all(docs.map((doc) => this.prepareDocumentForStorage(doc)))
+        );
         return docs.map((d) => ({ id: d._id }));
       }
     );
@@ -83,7 +96,8 @@ export class CollectionClient<T extends Record<string, any> = Record<string, any
       `Failed to query collection "${this.collectionName}"`,
       async () => {
         const all = await this.table.toArray();
-        return all.filter((doc) => this.matchesFilter(doc, filter));
+        const decrypted = await Promise.all(all.map((doc) => this.decryptRow(doc)));
+        return decrypted.filter((doc) => this.matchesFilter(doc, filter));
       }
     );
   }
@@ -95,7 +109,10 @@ export class CollectionClient<T extends Record<string, any> = Record<string, any
     return wrapIDBOperation(
       ErrorCode.DB_READ_FAILED,
       `Failed to get document "${id}" from "${this.collectionName}"`,
-      () => this.table.get(id)
+      async () => {
+        const row = await this.table.get(id);
+        return row ? this.decryptRow(row) : undefined;
+      }
     );
   }
 
@@ -110,7 +127,11 @@ export class CollectionClient<T extends Record<string, any> = Record<string, any
       async () => {
         const matches = await this.find(filter);
         const now = Date.now();
-        await this.table.bulkPut(matches.map((doc) => this.applyUpdateSpec(doc, spec, now)));
+        await this.table.bulkPut(
+          await Promise.all(
+            matches.map((doc) => this.prepareDocumentForStorage(this.applyUpdateSpec(doc, spec, now)))
+          )
+        );
         return matches.length;
       }
     );
@@ -154,6 +175,34 @@ export class CollectionClient<T extends Record<string, any> = Record<string, any
   async count(filter: QueryFilter<T> = {}): Promise<number> {
     const docs = await this.find(filter);
     return docs.length;
+  }
+
+  private async prepareDocumentForStorage(doc: Document<T>): Promise<StoredRow<T>> {
+    if (!this.crypto) {
+      return doc;
+    }
+
+    const { _id, _createdAt, _updatedAt, ...payload } = doc as Record<string, any>;
+    return {
+      _id,
+      _createdAt,
+      _updatedAt,
+      encryptedPayload: await this.crypto.encrypt(payload as T),
+    };
+  }
+
+  private async decryptRow(row: StoredRow<T>): Promise<Document<T>> {
+    if (!this.crypto || typeof (row as EncryptedRecord).encryptedPayload === "undefined") {
+      return row as Document<T>;
+    }
+
+    const decrypted = await this.crypto.decrypt<T>((row as EncryptedRecord).encryptedPayload);
+    return {
+      ...decrypted,
+      _id: row._id,
+      _createdAt: row._createdAt,
+      _updatedAt: row._updatedAt,
+    };
   }
 
   private applyUpdateSpec(doc: Document<T>, spec: UpdateSpec<T>, updatedAt: number): Document<T> {
@@ -254,18 +303,25 @@ class ZerithDBDexie extends Dexie {
 export class DbClient {
   private readonly dexie: ZerithDBDexie;
   private readonly appId: string;
+  private readonly crypto?: LocalDbCrypto;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private readonly collections = new Map<string, CollectionClient<any>>();
 
   constructor(config: ZerithDBConfig) {
     this.appId = config.appId;
     this.dexie = new ZerithDBDexie(config.appId);
+    if (config.security?.encryptLocalDB === true) {
+      this.crypto = new LocalDbCrypto(config.appId);
+    }
   }
 
   collection<T extends Record<string, any>>(name: string): CollectionClient<T> {
     if (!this.collections.has(name)) {
       const table = this.dexie.ensureCollection(name);
-      this.collections.set(name, new CollectionClient<T>(table as Table<Document<T>>, name));
+      this.collections.set(
+        name,
+        new CollectionClient<T>(table as Table<StoredRow<T>>, name, this.crypto)
+      );
     }
     return this.collections.get(name) as CollectionClient<T>;
   }
@@ -311,7 +367,24 @@ export class DbClient {
 
         for (const name of collectionNames) {
           const table = this.dexie.ensureCollection(name);
-          collections[name] = (await table.toArray()) as Document<Record<string, any>>[];
+          const rows = await table.toArray();
+          collections[name] = await Promise.all(
+            rows.map(async (row) => {
+              if (this.crypto && typeof (row as EncryptedRecord).encryptedPayload !== "undefined") {
+                const decrypted = await this.crypto.decrypt<Record<string, any>>(
+                  (row as EncryptedRecord).encryptedPayload
+                );
+                return {
+                  ...decrypted,
+                  _id: row._id,
+                  _createdAt: row._createdAt,
+                  _updatedAt: row._updatedAt,
+                } as Document<Record<string, any>>;
+              }
+
+              return row as Document<Record<string, any>>;
+            })
+          );
         }
 
         return {
