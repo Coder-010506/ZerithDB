@@ -9,6 +9,7 @@ import type {
 } from "zerithdb-core";
 import { ZerithDBError, ErrorCode } from "zerithdb-core";
 import { wrapIDBOperation } from "./internal/wrap-idb-operation.js";
+import { LocalDbEncryption } from "./encryption.js";
 import type { BackupExportOptions, BackupSnapshot } from "./backup.js";
 
 /**
@@ -17,8 +18,10 @@ import type { BackupExportOptions, BackupSnapshot } from "./backup.js";
  */
 export class CollectionClient<T extends Record<string, any> = Record<string, any>> {
   constructor(
-    private readonly table: Table<Document<T>>,
-    private readonly collectionName: string
+    private readonly table: Table<Record<string, any>>,
+    private readonly collectionName: string,
+    private readonly encryptRecord: (document: Document<T>) => Promise<Record<string, any>>,
+    private readonly decryptRecord: (record: Record<string, any>) => Promise<Document<T>>
   ) {}
 
   /**
@@ -39,7 +42,7 @@ export class CollectionClient<T extends Record<string, any> = Record<string, any
       ErrorCode.DB_WRITE_FAILED,
       `Failed to insert into collection "${this.collectionName}"`,
       async () => {
-        await this.table.add(doc);
+        await this.table.add(await this.encryptRecord(doc));
         return { id };
       }
     );
@@ -61,7 +64,9 @@ export class CollectionClient<T extends Record<string, any> = Record<string, any
       ErrorCode.DB_WRITE_FAILED,
       `Failed to bulk insert into collection "${this.collectionName}"`,
       async () => {
-        await this.table.bulkAdd(docs);
+        await this.table.bulkAdd(
+          await Promise.all(docs.map((doc) => this.encryptRecord(doc)))
+        );
         return docs.map((d) => ({ id: d._id }));
       }
     );
@@ -83,7 +88,8 @@ export class CollectionClient<T extends Record<string, any> = Record<string, any
       `Failed to query collection "${this.collectionName}"`,
       async () => {
         const all = await this.table.toArray();
-        return all.filter((doc) => this.matchesFilter(doc, filter));
+        const decrypted = await Promise.all(all.map((doc) => this.decryptRecord(doc)));
+        return decrypted.filter((doc) => this.matchesFilter(doc, filter));
       }
     );
   }
@@ -95,7 +101,10 @@ export class CollectionClient<T extends Record<string, any> = Record<string, any
     return wrapIDBOperation(
       ErrorCode.DB_READ_FAILED,
       `Failed to get document "${id}" from "${this.collectionName}"`,
-      () => this.table.get(id)
+      async () => {
+        const record = await this.table.get(id);
+        return record ? this.decryptRecord(record) : undefined;
+      }
     );
   }
 
@@ -110,7 +119,11 @@ export class CollectionClient<T extends Record<string, any> = Record<string, any
       async () => {
         const matches = await this.find(filter);
         const now = Date.now();
-        await this.table.bulkPut(matches.map((doc) => this.applyUpdateSpec(doc, spec, now)));
+        await this.table.bulkPut(
+          await Promise.all(
+            matches.map((doc) => this.encryptRecord(this.applyUpdateSpec(doc, spec, now)))
+          )
+        );
         return matches.length;
       }
     );
@@ -254,20 +267,48 @@ class ZerithDBDexie extends Dexie {
 export class DbClient {
   private readonly dexie: ZerithDBDexie;
   private readonly appId: string;
+  private readonly encryptLocalDB: boolean;
+  private readonly encryption?: LocalDbEncryption;
+  private readonly encryptionReady: Promise<void>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private readonly collections = new Map<string, CollectionClient<any>>();
 
   constructor(config: ZerithDBConfig) {
     this.appId = config.appId;
+    this.encryptLocalDB = config.security?.encryptLocalDB === true;
+    this.encryption = this.encryptLocalDB ? new LocalDbEncryption(config.appId) : undefined;
+    this.encryptionReady = this.encryptLocalDB && this.encryption ? this.encryption.init() : Promise.resolve();
     this.dexie = new ZerithDBDexie(config.appId);
   }
 
   collection<T extends Record<string, any>>(name: string): CollectionClient<T> {
     if (!this.collections.has(name)) {
       const table = this.dexie.ensureCollection(name);
-      this.collections.set(name, new CollectionClient<T>(table as Table<Document<T>>, name));
+      this.collections.set(
+        name,
+        new CollectionClient<T>(
+          table as Table<Record<string, any>>,
+          name,
+          (doc) => this.encryptDocument(doc),
+          (record) => this.decryptDocument(record)
+        )
+      );
     }
     return this.collections.get(name) as CollectionClient<T>;
+  }
+
+  private async encryptDocument<T extends Record<string, any>>(
+    document: Document<T>
+  ): Promise<Record<string, any>> {
+    await this.encryptionReady;
+    return this.encryption ? this.encryption.encrypt(document) : document as Record<string, any>;
+  }
+
+  private async decryptDocument<T extends Record<string, any>>(
+    record: Record<string, any>
+  ): Promise<Document<T>> {
+    await this.encryptionReady;
+    return this.encryption ? this.encryption.decrypt(record) : (record as Document<T>);
   }
 
   async getMemoryStats(): Promise<{ recordCount: number; collections: Record<string, number> }> {
@@ -311,7 +352,8 @@ export class DbClient {
 
         for (const name of collectionNames) {
           const table = this.dexie.ensureCollection(name);
-          collections[name] = (await table.toArray()) as Document<Record<string, any>>[];
+          const rows = await table.toArray();
+          collections[name] = await Promise.all(rows.map((row) => this.decryptDocument(row)));
         }
 
         return {

@@ -52,6 +52,15 @@ export interface DebugConfig {
   devtools?: boolean;
 }
 
+export interface SecurityConfig {
+  /**
+   * Enable transparent local IndexedDB encryption for the ZerithDB collection store.
+   * This is opt-in and uses the Web Crypto API to encrypt document payloads at rest.
+   * @default false
+   */
+  encryptLocalDB?: boolean;
+}
+
 export interface NetworkConfig {
   /**
    * Whether to automatically reconnect when a peer disconnects.
@@ -78,6 +87,7 @@ export interface ZerithDBConfig {
   auth?: AuthConfig;
   network?: NetworkConfig;
   debug?: DebugConfig;
+  security?: SecurityConfig;
 
   /**
    * Log level for internal ZerithDB diagnostics.

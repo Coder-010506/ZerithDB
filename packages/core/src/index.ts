@@ -7,6 +7,7 @@ export { ZerithDBError, ErrorCode } from "./internal/errors.js";
 export { Logger } from "./internal/logger.js";
 export type {
   ZerithDBConfig,
+  SecurityConfig,
   SyncConfig,
   AuthConfig,
   NetworkConfig,
