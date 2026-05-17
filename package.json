@@ -2,6 +2,10 @@
   "name": "zerithdb",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "description": "Local-first, peer-to-peer backend platform. The browser is the server.",
   "author": "ZerithDB Contributors",
   "license": "Apache-2.0",
@@ -21,7 +25,7 @@
     "changeset": "changeset",
     "version-packages": "changeset version",
     "release": "turbo run build --filter=!./apps/* && changeset publish",
-    "prepare": "husky",
+    "prepare": "husky && sh scripts/setup-git-config.sh",
     "build:audit": "pnpm --filter zerithdb-audit build",
     "benchmark": "tsx scripts/benchmark.ts"
   },

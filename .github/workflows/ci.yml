@@ -13,6 +13,8 @@ permissions:
 env:
   CI: true
   TURBO_TELEMETRY_DISABLED: 1
+  # Disable Copilot to avoid rate limit issues
+  COPILOT_DISABLED: true
 
 # Cancel in-progress runs for the same branch/PR to save minutes
 concurrency:
@@ -103,7 +105,7 @@ jobs:
         run: pnpm turbo build
 
       - name: Run unit tests (Vitest)
-        run: pnpm turbo test
+        run: pnpm exec vitest run
 
       - name: Upload coverage report
         if: always()

@@ -9,9 +9,9 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "require": "./dist/index.cjs",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/index.cjs"
     }
   },
   "scripts": {
@@ -24,7 +24,8 @@
   "dependencies": {
     "zerithdb-auth": "workspace:*",
     "zerithdb-core": "workspace:*",
-    "simple-peer": "^9.11.1"
+    "simple-peer": "^9.11.1",
+    "zerithdb-errors": "workspace:*"
   },
   "devDependencies": {
     "zerithdb-eslint-config": "workspace:*",
