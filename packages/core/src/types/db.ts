@@ -27,7 +27,8 @@ export type QueryFilter<T extends Record<string, any>> = {
     | { $lt: T[K] }
     | { $lte: T[K] }
     | { $in: T[K][] }
-    | { $nin: T[K][] };
+    | { $nin: T[K][] }
+    | { $regex: RegExp | string };
 };
 
 /** Partial update spec — only specified fields are modified */
